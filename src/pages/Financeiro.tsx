@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
-import { 
-  DollarSign, TrendingUp, X, 
-  Wallet, CreditCard, Receipt, 
+import {
+  DollarSign, TrendingUp, X,
+  Wallet, CreditCard, Receipt,
   ArrowUpRight, ArrowDownLeft, Target, Save, Loader2,
 } from 'lucide-react'
-import { 
-  collection, query, where, onSnapshot, addDoc, 
-  updateDoc, doc, serverTimestamp, limit, orderBy 
+import {
+  collection, query, where, onSnapshot, addDoc,
+  updateDoc, doc, serverTimestamp, limit, orderBy
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../hooks/useAuth'
@@ -16,7 +16,7 @@ export default function Financeiro() {
   const [caixaAtual, setCaixaAtual] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-  
+
   const [descSaida, setDescSaida] = useState('')
   const [valorSaida, setValorSaida] = useState('')
   const [catSaida, setCatSaida] = useState('Suprimentos')
@@ -126,22 +126,20 @@ export default function Financeiro() {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-28 px-4 text-zinc-100">
-      
+
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-[#6CC551] animate-pulse" />
-            <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter leading-none text-white">
-              Gestão Financeira
-            </h2>
+            <h2 className="text-xl font-black italic uppercase tracking-tighter text-white">GERTÃO FINANCEIRA</h2>
           </div>
           <p className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em] opacity-80 italic">Fluxo de Caixa em Tempo Real</p>
         </div>
 
         {caixaAtual && (
-          <button 
-            onClick={() => setIsModalOpen(true)} 
+          <button
+            onClick={() => setIsModalOpen(true)}
             className="w-full md:w-auto flex items-center justify-center gap-3 bg-red-500/10 border border-red-500/20 text-red-500 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-lg"
           >
             <ArrowDownLeft size={18} strokeWidth={3} /> Registrar Retirada
@@ -156,8 +154,8 @@ export default function Financeiro() {
           </div>
           <h3 className="text-xl md:text-2xl font-black italic text-white mb-2 uppercase tracking-tighter">Turno Encerrado</h3>
           <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-12 max-w-xs mx-auto opacity-60">O monitoramento financeiro está pausado. Inicie um novo turno para registrar vendas.</p>
-          <button 
-            onClick={handleAbrirCaixa} 
+          <button
+            onClick={handleAbrirCaixa}
             className="bg-[#6CC551] text-black px-14 py-5 rounded-4xl font-black uppercase text-[11px] tracking-[0.3em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#6CC551]/10"
           >
             Abrir Novo Caixa
@@ -165,28 +163,28 @@ export default function Financeiro() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* PAINEL ESQUERDO: MÉTRICAS */}
           <div className="lg:col-span-8 space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <FinanceMiniCard 
-                label="Saldo em Mãos" 
-                value={(caixaAtual.valorAbertura + (caixaAtual.totalDinheiro || 0) - (caixaAtual.totalSaidas || 0)).toFixed(2)} 
-                icon={<Wallet size={16}/>} 
-                color="#32C5C5" 
+              <FinanceMiniCard
+                label="Saldo em Mãos"
+                value={(caixaAtual.valorAbertura + (caixaAtual.totalDinheiro || 0) - (caixaAtual.totalSaidas || 0)).toFixed(2)}
+                icon={<Wallet size={16} />}
+                color="#32C5C5"
               />
-              <FinanceMiniCard 
-                label="Bruto Turno" 
-                value={caixaAtual.totalVendas?.toFixed(2)} 
-                icon={<ArrowUpRight size={16}/>} 
-                color="#6CC551" 
+              <FinanceMiniCard
+                label="Bruto Turno"
+                value={caixaAtual.totalVendas?.toFixed(2)}
+                icon={<ArrowUpRight size={16} />}
+                color="#6CC551"
               />
               <div className="col-span-2 lg:col-span-1">
-                <FinanceMiniCard 
-                  label="Retiradas" 
-                  value={caixaAtual.totalSaidas?.toFixed(2)} 
-                  icon={<ArrowDownLeft size={16}/>} 
-                  color="#EF4444" 
+                <FinanceMiniCard
+                  label="Retiradas"
+                  value={caixaAtual.totalSaidas?.toFixed(2)}
+                  icon={<ArrowDownLeft size={16} />}
+                  color="#EF4444"
                 />
               </div>
             </div>
@@ -197,9 +195,9 @@ export default function Financeiro() {
                 <Target size={16} className="text-[#6CC551]" /> Métodos de Entrada
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <MetodoItem icon={<DollarSign size={16}/>} label="Dinheiro" value={caixaAtual.totalDinheiro} color="#6CC551" />
-                <MetodoItem icon={<TrendingUp size={16}/>} label="Pix" value={caixaAtual.totalPix} color="#32C5C5" />
-                <MetodoItem icon={<CreditCard size={16}/>} label="Cartões" value={caixaAtual.totalCartao} color="#A855F7" />
+                <MetodoItem icon={<DollarSign size={16} />} label="Dinheiro" value={caixaAtual.totalDinheiro} color="#6CC551" />
+                <MetodoItem icon={<TrendingUp size={16} />} label="Pix" value={caixaAtual.totalPix} color="#32C5C5" />
+                <MetodoItem icon={<CreditCard size={16} />} label="Cartões" value={caixaAtual.totalCartao} color="#A855F7" />
               </div>
             </div>
           </div>
@@ -212,7 +210,7 @@ export default function Financeiro() {
                   <Receipt size={16} className="text-red-500" /> Linha do Tempo (Saídas)
                 </h3>
               </div>
-              
+
               <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-112.5 no-scrollbar">
                 {caixaAtual.historicoSaidas?.length > 0 ? (
                   caixaAtual.historicoSaidas.map((d: any, i: number) => (
@@ -230,8 +228,8 @@ export default function Financeiro() {
               </div>
 
               <div className="p-6 bg-zinc-950/20 border-t border-white/3">
-                <button 
-                  onClick={handleFecharCaixa} 
+                <button
+                  onClick={handleFecharCaixa}
                   className="w-full py-5 bg-zinc-900/50 border border-white/5 rounded-2xl text-[9px] font-black uppercase tracking-[0.3em] text-zinc-500 hover:text-red-500 hover:border-red-500/30 transition-all active:scale-95"
                 >
                   Fechar Turno Atual
@@ -251,35 +249,35 @@ export default function Financeiro() {
               <h4 className="text-lg font-black text-white italic uppercase tracking-tighter">Registrar Retirada</h4>
               <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors"><X size={24} /></button>
             </div>
-            
+
             <form className="p-8 space-y-6" onSubmit={handleRegistrarSaida}>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-zinc-600 uppercase ml-2 tracking-widest">Descrição / Motivo</label>
-                  <input 
-                    required 
-                    value={descSaida} 
-                    onChange={(e) => setDescSaida(e.target.value)} 
-                    className="w-full bg-zinc-950 border border-white/5 p-5 rounded-2xl text-white font-black italic text-xs outline-none focus:border-red-500/50 transition-all uppercase placeholder:text-zinc-800" 
-                    placeholder="EX: PAGAMENTO MOTOBOY" 
+                  <input
+                    required
+                    value={descSaida}
+                    onChange={(e) => setDescSaida(e.target.value)}
+                    className="w-full bg-zinc-950 border border-white/5 p-5 rounded-2xl text-white font-black italic text-xs outline-none focus:border-red-500/50 transition-all uppercase placeholder:text-zinc-800"
+                    placeholder="EX: PAGAMENTO MOTOBOY"
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-zinc-950 p-5 rounded-2xl border border-white/5 text-center">
                     <p className="text-[9px] font-black text-zinc-600 uppercase mb-2 tracking-widest">Valor R$</p>
-                    <input 
-                      type="number" step="0.01" required 
-                      value={valorSaida} onChange={(e) => setValorSaida(e.target.value)} 
-                      className="bg-transparent text-red-500 font-black outline-none w-full text-center text-xl italic tracking-tighter" 
-                      placeholder="0.00" 
+                    <input
+                      type="number" step="0.01" required
+                      value={valorSaida} onChange={(e) => setValorSaida(e.target.value)}
+                      className="bg-transparent text-red-500 font-black outline-none w-full text-center text-xl italic tracking-tighter"
+                      placeholder="0.00"
                     />
                   </div>
                   <div className="bg-zinc-950 p-5 rounded-2xl border border-white/5 text-center">
                     <p className="text-[9px] font-black text-zinc-600 uppercase mb-2 tracking-widest">Categoria</p>
-                    <select 
-                      value={catSaida} 
-                      onChange={(e) => setCatSaida(e.target.value)} 
+                    <select
+                      value={catSaida}
+                      onChange={(e) => setCatSaida(e.target.value)}
                       className="bg-transparent text-white font-black outline-none w-full text-center text-[11px] uppercase cursor-pointer"
                     >
                       <option value="Suprimentos" className="bg-zinc-900">Suprimentos</option>

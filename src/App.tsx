@@ -1,8 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
-import { useEffect, useState } from 'react' // Adicionado hooks
 
-// IMPORTAÇÃO DAS PÁGINAS
+// IMPORTAÇÃO DAS PÁGINAS E COMPONENTES
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Estoque from './pages/Estoque'
@@ -11,8 +10,10 @@ import Financeiro from './pages/Financeiro'
 import Relatorios from './pages/Relatorios'
 import Configuracoes from './pages/Configuracoes'
 import Login from './pages/Login'
+import Comandas from './pages/Comandas' // Certifique-se de criar este arquivo
 import PinGuard from './components/PinGuard'
 
+// COMPONENTE DE ROTA PROTEGIDA (FIREBASE AUTH)
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
 
@@ -31,21 +32,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const { user, loading, isAuthenticated } = useAuth()
 
-  // LÓGICA DO PIN DINÂMICO
-  // Ele tenta buscar 'master_pin' do localStorage. Se não existir, usa "1234".
+  // LÓGICA DO PIN DINÂMICO PARA ÁREAS RESTRITAS
   const masterPin = localStorage.getItem('master_pin') || "1234"
 
-  if (loading) return null
+  if (loading) return (
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-[#6CC551]/20 border-t-[#6CC551] rounded-full animate-spin"></div>
+    </div>
+  )
 
   const storeEmail = user?.email || ""
 
   return (
     <Routes>
+      {/* ROTA PÚBLICA: LOGIN */}
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
       />
 
+      {/* ROTAS PROTEGIDAS PELO LAYOUT E AUTH */}
       <Route
         path="/"
         element={
@@ -54,9 +60,16 @@ export default function App() {
           </ProtectedRoute>
         }
       >
+        {/* REDIRECIONAMENTO INICIAL */}
         <Route index element={<Navigate to="/dashboard" replace />} />
 
-        {/* Usando o masterPin dinâmico em todas as rotas protegidas */}
+        {/* --- ROTA DE COMANDAS (SEM PIN) --- */}
+        <Route path="comandas" element={<Comandas storeEmail={storeEmail} />} />
+
+        {/* --- ROTA DE PDV (SEM PIN) --- */}
+        <Route path="pdv" element={<PDV storeEmail={storeEmail} />} />
+
+        {/* --- ROTAS COM PROTEÇÃO DE PIN (PIN GUARD) --- */}
         <Route path="dashboard" element={
           <PinGuard correctPin={masterPin} title="Dashboard">
             <Dashboard storeEmail={storeEmail} />
@@ -81,10 +94,15 @@ export default function App() {
           </PinGuard>
         } />
 
-        <Route path="pdv" element={<PDV storeEmail={storeEmail} />} />
-        <Route path="financeiro" element={<Financeiro />} />
+        {/* FINANCEIRO GERALMENTE É RESTRITO AO ADMIN NO LAYOUT */}
+        <Route path="financeiro" element={
+          <PinGuard correctPin={masterPin} title="Financeiro">
+            <Financeiro />
+          </PinGuard>
+        } />
       </Route>
 
+      {/* FALLBACK PARA QUALQUER ROTA INEXISTENTE */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
