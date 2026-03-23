@@ -28,7 +28,7 @@ export default function Layout() {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Painel Geral' },
     { path: '/estoque', icon: Package, label: 'Estoque' },
-    { path: '/pdv', icon: ShoppingCart, label: 'Frente de Caixa' },
+    { path: '/pdv', icon: ShoppingCart, label: 'Caixa' },
     { path: '/comandas', icon: FileText, label: 'Comandas' },
     { path: '/financeiro', icon: DollarSign, label: 'Financeiro', adminOnly: true },
     { path: '/relatorios', icon: FileText, label: 'Relatórios', adminOnly: true },

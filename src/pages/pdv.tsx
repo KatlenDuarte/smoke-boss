@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Plus, TrendingUp, Search, CreditCard, Banknote,
-  QrCode, ChevronRight, Eye, EyeOff, Smartphone, Clock, Loader2, Calendar, User
+  QrCode, ChevronRight, Eye, EyeOff, Smartphone, Clock, Loader2, Calendar, User, X
 } from 'lucide-react'
-import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore";
+import { 
+  collection, query, orderBy, onSnapshot, where, 
+  doc, deleteDoc, updateDoc, increment 
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
 import ModalNovaVenda from '../components/ModalNovaVenda'
 
@@ -15,10 +18,12 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
   const [isLoading, setIsLoading] = useState(true)
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0])
 
+  // Formata a data do input (YYYY-MM-DD) para o padrão do banco (DD/MM/YYYY)
   const selectedDateStr = useMemo(() => {
-    const [year, month, day] = dataFiltro.split('-')
-    return `${day}/${month}/${year}`
-  }, [dataFiltro])
+    if (!dataFiltro) return "";
+    const [year, month, day] = dataFiltro.split('-');
+    return `${day}/${month}/${year}`;
+  }, [dataFiltro]);
 
   useEffect(() => {
     if (!storeEmail) return;
@@ -48,6 +53,42 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
     return () => unsubscribe();
   }, [storeEmail, selectedDateStr]);
 
+  // FUNÇÃO DE ESTORNO (DEVOLUÇÃO)
+  const handleEstornarVenda = async (venda: any) => {
+    const pinSalvo = localStorage.getItem('fechamento_pin') || '1234';
+    const pinDigitado = prompt(`Digite o PIN para estornar a venda #${venda.id.slice(-4).toUpperCase()}:`);
+
+    if (pinDigitado !== pinSalvo) {
+      alert("PIN Incorreto! Operação cancelada.");
+      return;
+    }
+
+    if (!confirm("Isso excluirá a venda e devolverá os produtos ao estoque. Confirmar?")) return;
+
+    setIsLoading(true);
+    try {
+      // 1. Devolve os itens ao estoque um por um
+      const promessasEstoque = venda.items.map((item: any) => {
+        const pRef = doc(db, "products", item.id);
+        return updateDoc(pRef, {
+          estoque: increment(item.qtd)
+        });
+      });
+
+      await Promise.all(promessasEstoque);
+
+      // 2. Deleta o registro da venda
+      await deleteDoc(doc(db, "sales", venda.id));
+
+      alert("Venda estornada e produtos devolvidos ao estoque!");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao processar estorno.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const filteredSales = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return vendas.filter(v =>
@@ -75,7 +116,7 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 md:space-y-8 pb-32 md:pb-24 px-4 text-zinc-100 antialiased">
       
-      {/* HEADER ADAPTATIVO */}
+      {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-6">
         <div className="w-full md:w-auto space-y-4">
           <div className="flex items-center justify-between md:justify-start gap-3">
@@ -83,7 +124,6 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
               <div className="h-2.5 w-2.5 rounded-full bg-[#6CC551] shadow-[0_0_10px_#6CC551] animate-pulse" />
               <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter">Terminal</h2>
             </div>
-            {/* Botão de Visibilidade Mobile */}
             <button onClick={() => setShowValues(!showValues)} className="md:hidden p-3 bg-zinc-900 rounded-xl text-zinc-500">
               {showValues ? <Eye size={20} /> : <EyeOff size={20} />}
             </button>
@@ -108,7 +148,6 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
           </div>
         </div>
 
-        {/* Botões Desktop */}
         <div className="hidden md:flex items-center gap-3">
           <button onClick={() => setShowValues(!showValues)} className="p-4 bg-zinc-900 border border-white/5 rounded-2xl text-zinc-500 hover:text-white transition-all">
             {showValues ? <Eye size={20} /> : <EyeOff size={20} />}
@@ -119,7 +158,7 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
         </div>
       </header>
 
-      {/* MÉTRICAS RESPONSIVAS (GRID 2 COLUNAS MOBILE) */}
+      {/* MÉTRICAS */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <MetricCard label="Pix" value={formatValue(stats.pix)} icon={<Smartphone size={16}/>} color="#6CC551" />
         <MetricCard label="Cartão" value={formatValue(stats.card)} icon={<CreditCard size={16}/>} color="#3B82F6" />
@@ -139,7 +178,7 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
         />
       </div>
 
-      {/* LISTA */}
+      {/* LISTA DE VENDAS */}
       <div className="space-y-4">
         <div className="flex justify-between items-center px-2">
           <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2 italic">
@@ -156,7 +195,12 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
           ) : (
             <div className="divide-y divide-white/[0.03]">
               {filteredSales.map((venda) => (
-                <VendaRow key={venda.id} venda={venda} blurValue={!showValues} />
+                <VendaRow 
+                  key={venda.id} 
+                  venda={venda} 
+                  blurValue={!showValues} 
+                  onEstorno={() => handleEstornarVenda(venda)}
+                />
               ))}
               {filteredSales.length === 0 && (
                 <div className="py-20 text-center opacity-20">
@@ -169,7 +213,7 @@ export default function PDV({ storeEmail }: { storeEmail: string }) {
         </div>
       </div>
 
-      {/* BOTÃO FIXO MOBILE (FAB) */}
+      {/* BOTÃO FIXO MOBILE */}
       <div className="fixed bottom-6 left-0 right-0 px-6 md:hidden z-40">
         <button 
           onClick={() => setIsModalAberto(true)}
@@ -202,10 +246,10 @@ function MetricCard({ label, value, icon, color }: any) {
     )
 }
 
-function VendaRow({ venda, blurValue }: { venda: any, blurValue: boolean }) {
+function VendaRow({ venda, blurValue, onEstorno }: { venda: any, blurValue: boolean, onEstorno: () => void }) {
   const isPix = venda.paymentMethod.includes('PIX')
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 md:p-6 hover:bg-white/[0.02] gap-4">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 md:p-6 hover:bg-white/[0.02] gap-4 relative">
       <div className="flex items-center gap-4 w-full md:w-auto">
         <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl bg-zinc-950 border border-white/5 ${isPix ? 'text-[#6CC551]' : 'text-blue-500'}`}>
           {isPix ? <Smartphone size={18} /> : <CreditCard size={18} />}
@@ -224,14 +268,22 @@ function VendaRow({ venda, blurValue }: { venda: any, blurValue: boolean }) {
         </div>
       </div>
       
-      <div className="flex justify-between items-center w-full md:w-auto border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
+      <div className="flex justify-between items-center w-full md:w-auto border-t md:border-t-0 border-white/5 pt-3 md:pt-0 gap-4">
         <div className="md:text-right">
           <p className={`text-base md:text-xl font-black text-white italic tracking-tighter ${blurValue && "blur-md"}`}>
             R$ {venda.total.toFixed(2)}
           </p>
           <p className="text-[8px] font-black text-[#6CC551] uppercase tracking-widest md:text-right">{venda.paymentMethod}</p>
         </div>
-        <ChevronRight size={18} className="text-zinc-800 ml-4 hidden md:block" />
+        
+        {/* BOTÃO DE ESTORNO */}
+        <button 
+          onClick={onEstorno}
+          className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all active:scale-90"
+          title="Estornar Venda"
+        >
+          <X size={16} strokeWidth={3} />
+        </button>
       </div>
     </div>
   )

@@ -93,12 +93,10 @@ const handleFinalizar = async () => {
 
   setIsSalvando(true);
   try {
-    // FORMATO PADRONIZADO (FORÇA DD/MM/YYYY)
     const agora = new Date();
-    const dia = String(agora.getDate()).padStart(2, '0');
-    const mes = String(agora.getMonth() + 1).padStart(2, '0');
-    const ano = agora.getFullYear();
-    const dataPadronizada = `${dia}/${mes}/${ano}`;
+    
+    // FORMATO PARA SALVAR (DD/MM/YYYY) - Usando local do Brasil
+    const dataPadronizada = agora.toLocaleDateString('pt-BR'); 
     
     const horaAgora = agora.toLocaleTimeString("pt-BR", { 
       hour: "2-digit", 
@@ -113,8 +111,8 @@ const handleFinalizar = async () => {
       total,
       metodoPagamento,
       items: carrinho.map(i => ({ id: i.id, nome: i.nome, qtd: i.qtd, preco: i.precoVenda })),
-      timestamp: serverTimestamp(), // OBRIGATÓRIO PARA O ORDERBY FUNCIONAR
-      data: dataPadronizada, // Salva o formato fixo
+      timestamp: serverTimestamp(),
+      data: dataPadronizada, // Ex: "23/03/2026"
       hora: horaAgora
     });
 

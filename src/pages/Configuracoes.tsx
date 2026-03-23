@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { 
   User, Shield, LogOut, Loader2, X, Plus, 
-  ChevronRight, Hash, Lock, Users
+  ChevronRight, Hash, Lock, Users, AlertCircle
 } from 'lucide-react'
-import { updatePassword, signOut } from 'firebase/auth'
+import { updatePassword, signOut, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
 import { auth, db } from '../lib/firebase'
 import { collection, addDoc, onSnapshot, query, deleteDoc, doc, orderBy } from "firebase/firestore"
 
@@ -12,9 +12,11 @@ export default function ConfiguracoesMobile() {
   const [loading, setLoading] = useState(false)
   
   // Estados de Segurança
+  const [senhaAtual, setSenhaAtual] = useState('') // Novo campo necessário
   const [novaSenha, setNovaSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
   const [novoPin, setNovoPin] = useState('')
+  const [showReauth, setShowReauth] = useState(false) // Controla a exibição do campo extra
   
   // Estados de Vendedores
   const [vendedores, setVendedores] = useState<{id: string, nome: string}[]>([])
@@ -44,18 +46,53 @@ export default function ConfiguracoesMobile() {
   const handleUpdateSecurity = async () => {
     setStatus({ type: '', msg: '' }); 
     setLoading(true)
+    
     try {
+      // Validação de PIN (Local)
       if (novoPin.length !== 4) throw new Error('PIN deve ter 4 dígitos')
       localStorage.setItem('master_pin', novoPin)
+
+      // Se houver tentativa de mudar a senha
       if (novaSenha) {
         if (novaSenha !== confirmarSenha) throw new Error('Senhas não coincidem')
-        if (auth.currentUser) await updatePassword(auth.currentUser, novaSenha)
+        if (!auth.currentUser) throw new Error('Usuário não autenticado')
+
+        try {
+          // Tenta atualizar a senha
+          await updatePassword(auth.currentUser, novaSenha)
+        } catch (error: any) {
+          // Se o erro for de login antigo (Re-auth necessária)
+          if (error.code === 'auth/requires-recent-login') {
+            if (!senhaAtual) {
+              setShowReauth(true)
+              throw new Error('Confirme sua senha atual para continuar')
+            }
+
+            // Se o usuário já digitou a senha atual, reautentica
+            const credential = EmailAuthProvider.credential(auth.currentUser.email!, senhaAtual)
+            await reauthenticateWithCredential(auth.currentUser, credential)
+            
+            // Tenta atualizar novamente após reautenticar
+            await updatePassword(auth.currentUser, novaSenha)
+          } else {
+            throw error
+          }
+        }
       }
+
+      // Sucesso total
       setStatus({ type: 'success', msg: 'Protocolos atualizados!' })
+      setNovaSenha('')
+      setConfirmarSenha('')
+      setSenhaAtual('')
+      setShowReauth(false)
       setTimeout(() => setStatus({ type: '', msg: '' }), 3000)
+
     } catch (error: any) {
       setStatus({ type: 'error', msg: error.message })
-    } finally { setLoading(false) }
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   const tabs = [
@@ -84,7 +121,7 @@ export default function ConfiguracoesMobile() {
         </button>
       </header>
 
-      {/* NAV TABS MOBILE (Scroll Horizontal) */}
+      {/* NAV TABS MOBILE */}
       <nav className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
         {tabs.map((tab) => (
           <button
@@ -102,7 +139,7 @@ export default function ConfiguracoesMobile() {
       </nav>
 
       <main className="min-h-[400px]">
-        {/* ABA PERFIL */}
+        {/* ABA PERFIL (Mantida conforme original) */}
         {activeTab === 'perfil' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-zinc-900/30 border border-white/5 rounded-[2.5rem] p-8 flex flex-col items-center text-center">
@@ -120,7 +157,7 @@ export default function ConfiguracoesMobile() {
           </div>
         )}
 
-        {/* ABA VENDEDORES */}
+        {/* ABA VENDEDORES (Mantida conforme original) */}
         {activeTab === 'vendedores' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-zinc-900/30 border border-white/5 rounded-[2rem] p-4 space-y-4">
@@ -160,11 +197,12 @@ export default function ConfiguracoesMobile() {
           </div>
         )}
 
-        {/* ABA SEGURANÇA */}
+        {/* ABA SEGURANÇA (Com Reautenticação) */}
         {activeTab === 'seguranca' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-zinc-900/30 border border-white/5 rounded-[2.5rem] p-6 space-y-6">
               
+              {/* PIN LOCAL */}
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">PIN de Fechamento (4 dígitos)</label>
                 <div className="relative">
@@ -178,7 +216,26 @@ export default function ConfiguracoesMobile() {
                 </div>
               </div>
 
+              {/* BLOCO DE SENHA FIREBASE */}
               <div className="space-y-4 pt-4 border-t border-white/5">
+                
+                {/* CAMPO DE SENHA ATUAL (Aparece via erro do Firebase) */}
+                {showReauth && (
+                  <div className="space-y-2 animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center gap-2 mb-1">
+                       <AlertCircle size={12} className="text-[#6CC551]" />
+                       <label className="text-[9px] font-black text-[#6CC551] uppercase tracking-widest">Confirmação Necessária</label>
+                    </div>
+                    <input
+                      type="password"
+                      value={senhaAtual}
+                      onChange={(e) => setSenhaAtual(e.target.value)}
+                      className="w-full bg-zinc-950 border border-[#6CC551]/40 rounded-2xl p-4 text-white text-sm outline-none focus:border-[#6CC551] font-bold placeholder:text-zinc-800"
+                      placeholder="SUA SENHA ATUAL"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Nova Senha de Acesso</label>
                   <input
@@ -212,16 +269,17 @@ export default function ConfiguracoesMobile() {
               <button 
                 onClick={handleUpdateSecurity} 
                 disabled={loading}
-                className="w-full py-5 bg-white text-black rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                className={`w-full py-5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
+                  showReauth ? 'bg-[#6CC551] text-black' : 'bg-white text-black'
+                }`}
               >
-                {loading ? <Loader2 className="animate-spin" size={16} /> : 'Salvar Protocolos'}
+                {loading ? <Loader2 className="animate-spin" size={16} /> : (showReauth ? 'Confirmar e Salvar' : 'Salvar Protocolos')}
               </button>
             </div>
           </div>
         )}
       </main>
 
-      {/* STYLE PARA REMOVER SCROLLBAR DA NAV */}
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
